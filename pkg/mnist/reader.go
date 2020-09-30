@@ -83,7 +83,6 @@ func ReadLabels(path string, limit int) ([]int, error) {
 }
 
 func LabelsToTensors(labels []int) []maths.Tensor {
-
 	tensors := make([]maths.Tensor, len(labels))
 	for i := 0; i < len(labels); i++ {
 		values := make([]float64, 10)
@@ -91,6 +90,5 @@ func LabelsToTensors(labels []int) []maths.Tensor {
 		t := maths.NewTensor([]int{10}, values) // 1d tensor of 10 values for 0-9
 		tensors[i] = *t
 	}
-
 	return tensors
 }

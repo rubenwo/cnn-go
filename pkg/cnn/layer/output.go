@@ -10,8 +10,27 @@ type OutputLayer struct {
 	previousSoftMaxInput maths.Tensor
 }
 
+func NewOutputLayer(inputDims []int) *OutputLayer {
+	return &OutputLayer{
+		outputDims: inputDims}
+}
+
 func (o *OutputLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
-	return input
+	o.previousSoftMaxInput = input
+
+	output := input.Zeroes()
+	expSum := 0.0
+
+	for i := 0; i < len(input.Values()); i++ {
+		output.SetValue(i, math.Exp(input.Values()[i]))
+		expSum += output.Values()[i]
+	}
+
+	for i := 0; i < len(output.Values()); i++ {
+		output.SetValue(i, output.Values()[i]/expSum)
+	}
+
+	return *output
 }
 func (o *OutputLayer) BackwardPropagation(gradient maths.Tensor, lr float64) maths.Tensor {
 	d := o.derivatives(o.previousSoftMaxInput)

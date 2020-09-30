@@ -26,36 +26,91 @@ func (n *Network) SetLearningRate(rate float64) {
 	n.learningRate = rate
 }
 
-func (n *Network) AddConvolutionLayer(dimensions []int, filterCount int) *Network {
+func (n *Network) AddConvolutionLayer(filterDimensions []int, filterCount int) *Network {
+	var dims []int
+	if len(n.layers) == 0 {
+		dims = n.inputDims
+	} else {
+		dims = n.layers[len(n.layers)-1].OutputDims()
+	}
+	n.layers = append(n.layers, layer.NewConvolutionLayer(filterDimensions, filterCount, dims))
 	return n
 }
 
 func (n *Network) AddMaxPoolingLayer(stride int, dimensions []int) *Network {
+	var dims []int
+	if len(n.layers) == 0 {
+		dims = n.inputDims
+	} else {
+		dims = n.layers[len(n.layers)-1].OutputDims()
+	}
+	strides := make([]int, len(dimensions))
+	for i := 0; i < len(strides); i++ {
+		strides[i] = stride
+	}
+
+	n.layers = append(n.layers, layer.NewMaxPoolingLayer(strides, dimensions, dims))
 	return n
 }
 
 func (n *Network) AddDenseLayer(outputLength int) *Network {
+	var dims []int
+	if len(n.layers) == 0 {
+		dims = n.inputDims
+	} else {
+		dims = n.layers[len(n.layers)-1].OutputDims()
+	}
+	n.layers = append(n.layers, layer.NewDenseLayer(outputLength, dims))
 	return n
 }
 
 func (n *Network) AddOutputLayer() *Network {
+	var dims []int
+	if len(n.layers) == 0 {
+		dims = n.inputDims
+	} else {
+		dims = n.layers[len(n.layers)-1].OutputDims()
+	}
+
+	n.layers = append(n.layers, layer.NewOutputLayer(dims))
 	return n
 }
 
-func (n *Network) Fit(inputs []maths.Tensor, labels []maths.Tensor, epochs int, batchSize int, verbose bool, onBatchDone func()) {
-	fmt.Println("ignoring batch size")
-	if len(labels) != len(inputs) {
-		panic("length of labels is not equal to length of inputs")
-	}
-	for i := range inputs {
-		output := n.forward(inputs[i])
-		label := labels[i]
-		output = n.backward(n.loss.CalculateLossDerivative(label.Values(), output.Values()))
+// Fit will train the CNN. inputs are the inputs, labels are the labels.
+// epochs are the amount of times the network is fitted
+// batchSize is the size of every propagation batch.
+// if verbose then logging is enabled and is written to to stdout with fmt
+// every 'logRate' of iterations a message is written when verbose == true
+// onBatchDone is a callback that is called every time a batch is done. This can be used to reduce the learning rate for example
+func (n *Network) Fit(inputs []maths.Tensor, labels []maths.Tensor, epochs int, batchSize int, verbose bool, logRate int, onEpochDone func()) {
+	fmt.Println("Fit: ignoring batch size")
+
+	for epoch := 0; epoch < epochs; epoch++ {
+		if len(labels) != len(inputs) {
+			panic("length of labels is not equal to length of inputs")
+		}
+		propagation := 0
+		for i := range inputs {
+			output := n.forward(inputs[i])
+
+			label := labels[i]
+			output = n.backward(n.loss.CalculateLossDerivative(label.Values(), output.Values()))
+			propagation++
+			// TODO: Add logging if verbose is true
+			if verbose && propagation >= logRate {
+				fmt.Println("TODO: Add logging")
+				propagation = 0
+			}
+		}
+		if onEpochDone != nil {
+			onEpochDone()
+		}
 	}
 }
 
 func (n *Network) Predict(input maths.Tensor) []float64 {
-	return nil
+	output := n.forward(input)
+	return output.Values()
 }
 
 func (n *Network) forward(input maths.Tensor) maths.Tensor {
