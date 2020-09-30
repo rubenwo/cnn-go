@@ -27,7 +27,7 @@ func main() {
 		AddDenseLayer(10). // 0-9
 		AddOutputLayer()
 
-	nn.Fit(imageTensors, labelTensors, 10, 64, true)
+	nn.Fit(imageTensors, labelTensors, 10, 64, true, nil)
 
 	img := maths.Tensor{}
 
