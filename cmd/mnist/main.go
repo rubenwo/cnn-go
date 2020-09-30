@@ -6,12 +6,19 @@ import (
 	"github.com/rubenwo/cnn-go/pkg/cnn/maths"
 	"github.com/rubenwo/cnn-go/pkg/cnn/metrics"
 	"github.com/rubenwo/cnn-go/pkg/mnist"
+	"log"
 )
 
 func main() {
-	labels := mnist.ReadLabels("./assets/mnist/train-labels-idx1-ubyte", 10000)
+	labels, err := mnist.ReadLabels("./assets/mnist/train-labels-idx1-ubyte", 10000)
+	if err != nil {
+		log.Fatal(err)
+	}
 	labelTensors := mnist.LabelsToTensors(labels)
-	imageTensors := mnist.ReadGrayImages("./assets/mnist/train-images-idx3-ubyte", 10000)
+	imageTensors, err := mnist.ReadGrayImages("./assets/mnist/train-images-idx3-ubyte", 10000)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	nn := cnn.New([]int{28, 28}, 0.0001, &metrics.CrossEntropyLoss{})
 
