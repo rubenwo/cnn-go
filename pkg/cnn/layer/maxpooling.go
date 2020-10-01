@@ -1,7 +1,6 @@
 package layer
 
 import (
-	"fmt"
 	"github.com/rubenwo/cnn-go/pkg/cnn/maths"
 	"math"
 )
@@ -17,7 +16,6 @@ type MaxPoolingLayer struct {
 }
 
 func NewMaxPoolingLayer(strides, sizes, inputDims []int) *MaxPoolingLayer {
-	fmt.Println(inputDims)
 	maxPool := &MaxPoolingLayer{}
 	maxPool.strides = strides
 	for len(maxPool.strides) < len(inputDims) {
@@ -43,7 +41,6 @@ func NewMaxPoolingLayer(strides, sizes, inputDims []int) *MaxPoolingLayer {
 
 func (m *MaxPoolingLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
 
-	fmt.Println(input.Dimensions())
 	for i := maths.NewRegionsIteratorWithStrides(&input, m.sizes, []int{}, m.strides); i.HasNext(); {
 		nextRegion := i.Next()
 		maxIndex := nextRegion.MaxValueIndex()

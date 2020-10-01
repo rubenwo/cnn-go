@@ -1,6 +1,8 @@
 package layer
 
-import "github.com/rubenwo/cnn-go/pkg/cnn/maths"
+import (
+	"github.com/rubenwo/cnn-go/pkg/cnn/maths"
+)
 
 type Layer interface {
 	ForwardPropagation(input maths.Tensor) maths.Tensor

@@ -30,10 +30,13 @@ func main() {
 		AddDenseLayer(10). // 0-9
 		AddOutputLayer()
 
-	nn.Fit(imageTensors, labelTensors, 10, 64, true, 100, nil)
+	nn.Fit(imageTensors, labelTensors, 12, 64, true, 100, func() {
+		nn.SetLearningRate(nn.LearningRate() * 0.82)
+	})
 
-	img := maths.Tensor{}
+	img := maths.NewTensor([]int{28, 28}, nil)
+	img.Randomize()
 
-	prediction := nn.Predict(img)
+	prediction := nn.Predict(*img)
 	fmt.Println(prediction)
 }

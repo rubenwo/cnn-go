@@ -65,17 +65,12 @@ func (t *Tensor) Add(other *Tensor, factor float64) *Tensor {
 
 func (t *Tensor) AppendTensor(other *Tensor, resultRank int) *Tensor {
 	newDimSizes := make([]int, resultRank)
-	for i, dim := range t.dimension {
-		newDimSizes[i] = dim
-	}
-
-	// Start new dimensions at 1
-	for i := len(t.dimension); i < resultRank; i++ {
+	for i := len(t.Dimensions()); i < resultRank; i++ {
 		newDimSizes[i] = 1
 	}
 
-	if len(other.dimension) >= resultRank {
-		newDimSizes[resultRank-1] += other.dimension[len(other.dimension)-1]
+	if len(other.Dimensions()) >= resultRank {
+		newDimSizes[resultRank-1] += other.dimension[len(t.dimension)-1]
 	} else {
 		newDimSizes[resultRank-1] += 1
 	}
@@ -84,13 +79,21 @@ func (t *Tensor) AppendTensor(other *Tensor, resultRank int) *Tensor {
 	for i := 0; i < len(t.values); i++ {
 		newValues[i] = t.values[i]
 	}
-	for i := 0; i < len(other.values); i++ {
-		newValues[i+len(t.values)] = other.values[i]
+
+	for i := len(t.values); i < len(t.values)+len(other.values); i++ {
+		newValues[i] = other.values[i-len(t.values)]
 	}
 
 	return NewTensor(newDimSizes, newValues)
 }
 
+func (t *Tensor) Apply(fn func(val float64, idx int) float64) {
+	for i := 0; i < len(t.values); i++ {
+		t.values[i] = fn(t.values[i], i)
+	}
+}
+
+// Randomize uses a rand.NormFloat64() function
 func (t *Tensor) Randomize() {
 	for i := 0; i < len(t.values); i++ {
 		t.values[i] = rand.NormFloat64()
