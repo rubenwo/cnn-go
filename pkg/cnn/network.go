@@ -100,6 +100,7 @@ func (n *Network) Fit(inputs []maths.Tensor, labels []maths.Tensor, epochs int, 
 		averageLoss := 0.0
 		accuracy := 0.0
 		for i := range inputs {
+			// train the network
 			output := n.forward(inputs[i])
 			n.backward(n.loss.CalculateLossDerivative(labels[i].Values(), output.Values()))
 

@@ -38,12 +38,12 @@ func (t *Tensor) MulElem(other *Tensor) *Tensor {
 	if t.Len() != other.Len() {
 		panic("dimension mismatch in Tensor.MulElem")
 	}
-	r := Tensor{dimension: t.dimension, values: make([]float64, t.Len())}
+	r := &Tensor{dimension: t.dimension, values: make([]float64, t.Len())}
 
 	for i := 0; i < t.Len(); i++ {
 		r.values[i] = t.values[i] * other.values[i]
 	}
-	return &r
+	return r
 }
 
 func (t *Tensor) MulScalar(scalar float64) *Tensor {
@@ -94,10 +94,12 @@ func (t *Tensor) Apply(fn func(val float64, idx int) float64) {
 }
 
 // Randomize uses a rand.NormFloat64() function
-func (t *Tensor) Randomize() {
-	for i := 0; i < len(t.values); i++ {
-		t.values[i] = rand.NormFloat64()
+func (t *Tensor) Randomize() *Tensor {
+	tensor := NewTensor(t.dimension, nil)
+	for i := 0; i < len(tensor.values); i++ {
+		tensor.values[i] = rand.NormFloat64()
 	}
+	return tensor
 }
 
 func (t *Tensor) SubTensor(dims []int, offset int) *Tensor {

@@ -22,12 +22,12 @@ func (o *OutputLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
 	expSum := 0.0
 
 	for i := 0; i < len(input.Values()); i++ {
-		output.SetValue(i, math.Exp(input.Values()[i]))
-		expSum += output.Values()[i]
+		output.SetValue(i, math.Exp(input.At(i)))
+		expSum += output.At(i)
 	}
 
 	for i := 0; i < len(output.Values()); i++ {
-		output.SetValue(i, output.Values()[i]/expSum)
+		output.SetValue(i, output.At(i)/expSum)
 	}
 
 	return *output

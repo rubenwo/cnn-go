@@ -59,13 +59,8 @@ func (m *MaxPoolingLayer) BackwardPropagation(gradient maths.Tensor, lr float64)
 		maxIndex := m.maxIndices[i.CoordIterator.GetCurrentCount()-1]
 		maxCoords := maths.HornerToCoords(maxIndex, m.sizes)
 		regionStart := i.CoordIterator.GetCurrentCoords()
-		coordsOfMax := func(l, r []int) []int {
-			ret := make([]int, len(l))
-			for i := 0; i < len(ret); i++ {
-				ret[i] = l[i] + r[i]
-			}
-			return ret
-		}(regionStart, maxCoords)
+		coordsOfMax := maths.AddIntSlices(regionStart, maxCoords)
+
 		inputGradients.Set(coordsOfMax, gradient.Values()[i.CoordIterator.GetCurrentCount()-1])
 	}
 

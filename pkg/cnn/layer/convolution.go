@@ -26,7 +26,7 @@ func NewConvolutionLayer(filterDimensionSizes []int, depth int, inputDims []int)
 	conv.filters = *maths.NewTensor(append(conv.filterDimensionSizes, depth), nil)
 
 	randLimits := math.Sqrt(2) / math.Sqrt(float64(maths.ProductIntSlice(inputDims)))
-	conv.filters.Randomize()
+	conv.filters = *conv.filters.Randomize()
 	conv.filters = *conv.filters.MulScalar(randLimits)
 
 	conv.outputDimensions = append(conv.ccMapSize, depth)

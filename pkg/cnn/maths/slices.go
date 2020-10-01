@@ -85,6 +85,14 @@ func MulFloat64Slices(l, r []float64) []float64 {
 	}
 	return ret
 }
+func MulFloat64ToSlice(l []float64, r float64) []float64 {
+	ret := make([]float64, len(l))
+	for i := 0; i < len(ret); i++ {
+		ret[i] = l[i] * r
+	}
+	return ret
+}
+
 func DivideFloat64Slices(l, r []float64) []float64 {
 	if len(l) != len(r) {
 		panic("DivideFloat64Slices len(l) != len(r)")

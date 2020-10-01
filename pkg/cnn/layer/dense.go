@@ -23,7 +23,7 @@ func NewDenseLayer(outputLength int, inputDims []int) *DenseLayer {
 	dense.outputDims = []int{outputLength}
 
 	dense.weights = *maths.NewTensor(append(inputDims, outputLength), nil)
-	dense.weights.Randomize()
+	dense.weights = *dense.weights.Randomize()
 
 	dense.biases = make([]float64, outputLength)
 
@@ -67,22 +67,7 @@ func (d *DenseLayer) BackwardPropagation(gradient maths.Tensor, lr float64) math
 	}
 
 	d.weights = *d.weights.Add(weightsGradient, -1.0*lr)
-
-	oValMult := func(l []float64, r float64) []float64 {
-		ret := make([]float64, len(l))
-		for i := 0; i < len(ret); i++ {
-			ret[i] = l[i] * r
-		}
-		return ret
-	}(gradient.Values(), -1.0*lr)
-
-	d.biases = func(l, r []float64) []float64 {
-		ret := make([]float64, len(l))
-		for i := 0; i < len(ret); i++ {
-			ret[i] = l[i] + r[i]
-		}
-		return ret
-	}(d.biases, oValMult)
+	d.biases = maths.AddFloat64Slices(d.biases, maths.MulFloat64ToSlice(gradient.Values(), -1.0*lr))
 
 	return *inputGradient
 }
