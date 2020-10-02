@@ -4,7 +4,7 @@ import (
 	"github.com/rubenwo/cnn-go/pkg/cnn/maths"
 )
 
-type DenseLayer struct {
+type FullyConnectedLayer struct {
 	weights maths.Tensor
 	biases  []float64
 
@@ -15,8 +15,8 @@ type DenseLayer struct {
 	recentInput  maths.Tensor
 }
 
-func NewDenseLayer(outputLength int, inputDims []int) *DenseLayer {
-	dense := &DenseLayer{}
+func NewFullyConnectedLayer(outputLength int, inputDims []int) *FullyConnectedLayer {
+	dense := &FullyConnectedLayer{}
 	dense.inputDims = inputDims
 	dense.recentInput = *maths.NewTensor(inputDims, nil)
 	dense.recentOutput = make([]float64, outputLength)
@@ -30,7 +30,7 @@ func NewDenseLayer(outputLength int, inputDims []int) *DenseLayer {
 	return dense
 }
 
-func (d *DenseLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
+func (d *FullyConnectedLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
 	d.recentInput = input
 
 	i := maths.NewRegionsIterator(&d.weights, d.inputDims, []int{})
@@ -48,7 +48,7 @@ func (d *DenseLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
 	return *maths.NewTensor([]int{len(d.recentOutput)}, d.recentOutput)
 }
 
-func (d *DenseLayer) BackwardPropagation(gradient maths.Tensor, lr float64) maths.Tensor {
+func (d *FullyConnectedLayer) BackwardPropagation(gradient maths.Tensor, lr float64) maths.Tensor {
 	var weightsGradient *maths.Tensor
 	for i := 0; i < len(gradient.Values()); i++ {
 		newGrads := d.recentInput.MulScalar(gradient.Values()[i])
@@ -72,4 +72,4 @@ func (d *DenseLayer) BackwardPropagation(gradient maths.Tensor, lr float64) math
 	return *inputGradient
 }
 
-func (d *DenseLayer) OutputDims() []int { return d.outputDims }
+func (d *FullyConnectedLayer) OutputDims() []int { return d.outputDims }

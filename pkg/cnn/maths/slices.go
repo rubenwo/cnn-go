@@ -3,15 +3,36 @@ package maths
 import "math"
 
 func AddIntSlices(l, r []int) []int {
-	if len(l) != len(r) {
-		panic("AddIntSlices len(l) != len(r)")
+	var max []int
+	var min []int
+	if len(l) > len(r) {
+		max = l
+		min = r
+	} else {
+		max = r
+		min = l
 	}
-	ret := make([]int, len(l))
-	for i := 0; i < len(ret); i++ {
-		ret[i] = l[i] + r[i]
+
+	ret := make([]int, len(max))
+	for i := 0; i < len(min); i++ {
+		ret[i] = max[i] + min[i]
+	}
+	for i := len(min); i < len(max); i++ {
+		ret[i] = max[i]
 	}
 	return ret
 }
+
+func IntSliceCopyOf(original []int, newLength int) []int {
+	copy := make([]int, newLength)
+
+	for i := 0; i < int(math.Min(float64(len(original)), float64(newLength))); i++ {
+		copy[i] = original[i]
+	}
+
+	return copy
+}
+
 func AddIntToAll(l []int, r int) []int {
 	ret := make([]int, len(l))
 	for i := 0; i < len(ret); i++ {
@@ -20,32 +41,62 @@ func AddIntToAll(l []int, r int) []int {
 	return ret
 }
 func SubtractIntSlices(l, r []int) []int {
-	if len(l) != len(r) {
-		panic("SubtractIntSlices len(l) != len(r)")
+	var max []int
+	var min []int
+	if len(l) > len(r) {
+		max = l
+		min = r
+	} else {
+		max = r
+		min = l
 	}
-	ret := make([]int, len(l))
-	for i := 0; i < len(ret); i++ {
+
+	ret := make([]int, len(max))
+	for i := 0; i < len(min); i++ {
 		ret[i] = l[i] - r[i]
+	}
+	for i := len(min); i < len(max); i++ {
+		ret[i] = max[i]
 	}
 	return ret
 }
 func DivideIntSlices(l, r []int) []int {
-	if len(l) != len(r) {
-		panic("DivideIntSlices len(l) != len(r)")
+	var max []int
+	var min []int
+	if len(l) > len(r) {
+		max = l
+		min = r
+	} else {
+		max = r
+		min = l
 	}
-	ret := make([]int, len(l))
-	for i := 0; i < len(ret); i++ {
+
+	ret := make([]int, len(max))
+	for i := 0; i < len(min); i++ {
 		ret[i] = l[i] / r[i]
+	}
+	for i := len(min); i < len(max); i++ {
+		ret[i] = max[i]
 	}
 	return ret
 }
 func MulIntSlices(l, r []int) []int {
-	if len(l) != len(r) {
-		panic("MulIntSlices len(l) != len(r)")
+	var max []int
+	var min []int
+	if len(l) > len(r) {
+		max = l
+		min = r
+	} else {
+		max = r
+		min = l
 	}
-	ret := make([]int, len(l))
-	for i := 0; i < len(ret); i++ {
+
+	ret := make([]int, len(max))
+	for i := 0; i < len(min); i++ {
 		ret[i] = l[i] * r[i]
+	}
+	for i := len(min); i < len(max); i++ {
+		ret[i] = max[i]
 	}
 	return ret
 }
@@ -59,12 +110,22 @@ func ProductIntSlice(arr []int) int {
 }
 
 func AddFloat64Slices(l, r []float64) []float64 {
-	if len(l) != len(r) {
-		panic("AddFloat64Slices len(l) != len(r)")
+	var max []float64
+	var min []float64
+	if len(l) > len(r) {
+		max = l
+		min = r
+	} else {
+		max = r
+		min = l
 	}
-	ret := make([]float64, len(l))
-	for i := 0; i < len(ret); i++ {
+
+	ret := make([]float64, len(max))
+	for i := 0; i < len(min); i++ {
 		ret[i] = l[i] + r[i]
+	}
+	for i := len(min); i < len(max); i++ {
+		ret[i] = max[i]
 	}
 	return ret
 }
@@ -76,12 +137,22 @@ func AddFloat64ToSlice(l []float64, r float64) []float64 {
 	return ret
 }
 func MulFloat64Slices(l, r []float64) []float64 {
-	if len(l) != len(r) {
-		panic("MulFloat64Slices len(l) != len(r)")
+	var max []float64
+	var min []float64
+	if len(l) > len(r) {
+		max = l
+		min = r
+	} else {
+		max = r
+		min = l
 	}
-	ret := make([]float64, len(l))
-	for i := 0; i < len(ret); i++ {
+
+	ret := make([]float64, len(max))
+	for i := 0; i < len(min); i++ {
 		ret[i] = l[i] * r[i]
+	}
+	for i := len(min); i < len(max); i++ {
+		ret[i] = max[i]
 	}
 	return ret
 }
@@ -94,12 +165,22 @@ func MulFloat64ToSlice(l []float64, r float64) []float64 {
 }
 
 func DivideFloat64Slices(l, r []float64) []float64 {
-	if len(l) != len(r) {
-		panic("DivideFloat64Slices len(l) != len(r)")
+	var max []float64
+	var min []float64
+	if len(l) > len(r) {
+		max = l
+		min = r
+	} else {
+		max = r
+		min = l
 	}
-	ret := make([]float64, len(l))
-	for i := 0; i < len(ret); i++ {
+
+	ret := make([]float64, len(max))
+	for i := 0; i < len(min); i++ {
 		ret[i] = l[i] / r[i]
+	}
+	for i := len(min); i < len(max); i++ {
+		ret[i] = max[i]
 	}
 	return ret
 }
@@ -139,4 +220,14 @@ func FindMaxIndexFloat64Slice(arr []float64) int {
 	}
 
 	return highestIndex
+}
+
+func FindMaxValueFloat64Slice(arr []float64) float64 {
+	highest := math.MaxFloat64 * -1
+	for _, val := range arr {
+		if val > highest {
+			highest = val
+		}
+	}
+	return highest
 }

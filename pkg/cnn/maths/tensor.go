@@ -14,11 +14,8 @@ type Tensor struct {
 func NewTensor(dimension []int, values []float64) *Tensor {
 	if values == nil {
 		//The length of our 1-dimensional values array needs to be equivalent to the product of all dimensions
-		p := 1
-		for _, d := range dimension {
-			p *= d
-		}
-		return &Tensor{dimension: dimension, values: make([]float64, p)}
+		//The values are initialized to 0
+		return &Tensor{dimension: dimension, values: make([]float64, ProductIntSlice(dimension))}
 	}
 	return &Tensor{dimension: dimension, values: values}
 }
@@ -34,27 +31,19 @@ func (t *Tensor) FirstDimsCopy(length int) []int {
 	return dims
 }
 
+// MulElem returns a new array which contains the values of t.value x other.value, elementwise multiplication
 func (t *Tensor) MulElem(other *Tensor) *Tensor {
 	if t.Len() != other.Len() {
 		panic("dimension mismatch in Tensor.MulElem")
 	}
-	r := &Tensor{dimension: t.dimension, values: make([]float64, t.Len())}
-
-	for i := 0; i < t.Len(); i++ {
-		r.values[i] = t.values[i] * other.values[i]
-	}
-	return r
+	return NewTensor(t.dimension, MulFloat64Slices(t.values, other.values))
 }
 
 func (t *Tensor) MulScalar(scalar float64) *Tensor {
-	values := make([]float64, t.Len())
-	for i := 0; i < len(values); i++ {
-		values[i] = t.values[i] * scalar
-	}
-
-	return NewTensor(t.dimension, values)
+	return NewTensor(t.dimension, MulFloat64ToSlice(t.values, scalar))
 }
 
+// Add Elementwise addition between two tensors. Each element of t is multiplied by "factor" first
 func (t *Tensor) Add(other *Tensor, factor float64) *Tensor {
 	values := make([]float64, len(t.values))
 	for i := 0; i < len(values); i++ {
@@ -64,25 +53,19 @@ func (t *Tensor) Add(other *Tensor, factor float64) *Tensor {
 }
 
 func (t *Tensor) AppendTensor(other *Tensor, resultRank int) *Tensor {
-	newDimSizes := make([]int, resultRank)
-	for i := len(t.Dimensions()); i < resultRank; i++ {
+	newDimSizes := IntSliceCopyOf(t.dimension, resultRank)
+
+	for i := len(t.dimension); i < resultRank; i++ {
 		newDimSizes[i] = 1
 	}
 
-	if len(other.Dimensions()) >= resultRank {
-		newDimSizes[resultRank-1] += other.dimension[len(t.dimension)-1]
+	if len(other.dimension) >= resultRank {
+		newDimSizes[resultRank-1] += other.dimension[len(other.dimension)-1]
 	} else {
 		newDimSizes[resultRank-1] += 1
 	}
 
-	newValues := make([]float64, len(t.values)+len(other.values))
-	for i := 0; i < len(t.values); i++ {
-		newValues[i] = t.values[i]
-	}
-
-	for i := len(t.values); i < len(t.values)+len(other.values); i++ {
-		newValues[i] = other.values[i-len(t.values)]
-	}
+	newValues := append(t.values, other.values...)
 
 	return NewTensor(newDimSizes, newValues)
 }
@@ -93,12 +76,14 @@ func (t *Tensor) Apply(fn func(val float64, idx int) float64) {
 	}
 }
 
-// Randomize uses a rand.NormFloat64() function
+//Randomize uses a rand.NormFloat64() function which returns a random using normally distributed values with
+// mean 0, stan dev 1
 func (t *Tensor) Randomize() *Tensor {
 	tensor := NewTensor(t.dimension, nil)
 	for i := 0; i < len(tensor.values); i++ {
 		tensor.values[i] = rand.NormFloat64()
 	}
+
 	return tensor
 }
 
@@ -115,6 +100,7 @@ func (t *Tensor) SubTensor(dims []int, offset int) *Tensor {
 	return tensor
 }
 
+// Returns a tensor with opposite corners at corner1 and corner2
 func (t *Tensor) Region(corner1, corner2 []int) *Tensor {
 	newDimSizes := make([]int, len(corner1))
 	for i := 0; i < len(newDimSizes); i++ {
@@ -154,9 +140,10 @@ func (t *Tensor) Equals(other *Tensor) bool {
 	return true
 }
 
+// InnerProduct Multiply each element of t1 with a corresponding element of t2, then sum these values
 func (t *Tensor) InnerProduct(other *Tensor) float64 {
 	if len(t.values) != len(other.values) {
-		panic("Tensor.InnerProduct dimension mismatch")
+		panic(fmt.Sprintf("len(t.values)=%d != len(other.values)=%d", len(t.values), len(other.values)))
 	}
 	result := 0.0
 	for i := 0; i < len(t.values); i++ {
@@ -166,36 +153,16 @@ func (t *Tensor) InnerProduct(other *Tensor) float64 {
 }
 
 func (t *Tensor) MaxValueIndex() int {
-	highestIndex := -1
-	highestValue := math.MaxFloat64 * -1
-	for i := 0; i < len(t.values); i++ {
-		if highestValue < t.values[i] {
-			highestValue = t.values[i]
-			highestIndex = i
-		}
-	}
-	return highestIndex
+	return FindMaxIndexFloat64Slice(t.values)
 }
 func (t *Tensor) MaxValue() float64 {
-	highestValue := math.MaxFloat64 * -1
-	for i := 0; i < len(t.values); i++ {
-		if highestValue < t.values[i] {
-			highestValue = t.values[i]
-		}
-	}
-	return highestValue
+	return FindMaxValueFloat64Slice(t.values)
 }
 
 func (t *Tensor) Flip() *Tensor {
 	flippedTensor := NewTensor(t.dimension, nil)
 
-	i := NewCoordIterator([]int{0, 0, 0}, func(l []int, r int) []int {
-		ret := make([]int, len(l))
-		for i := 0; i < len(ret); i++ {
-			ret[i] = l[i] + r
-		}
-		return ret
-	}(t.dimension, -1))
+	i := NewCoordIterator([]int{0, 0, 0}, AddIntToAll(t.dimension, -1))
 
 	for i.HasNext() {
 		currentCoords := i.Next()
@@ -218,6 +185,7 @@ func (t *Tensor) AtCoords(coords []int) float64 {
 	if index >= 0 && index < len(t.values) {
 		return t.values[index]
 	}
+	// Return 0 if trying to access a coordinate beyond boundaries. This is useful for padding.
 	return 0
 }
 

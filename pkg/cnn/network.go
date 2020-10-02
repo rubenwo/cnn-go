@@ -56,18 +56,29 @@ func (n *Network) AddMaxPoolingLayer(stride int, dimensions []int) *Network {
 	return n
 }
 
-func (n *Network) AddDenseLayer(outputLength int) *Network {
+func (n *Network) AddFullyConnectedLayer(outputLength int) *Network {
 	var dims []int
 	if len(n.layers) == 0 {
 		dims = n.inputDims
 	} else {
 		dims = n.layers[len(n.layers)-1].OutputDims()
 	}
-	n.layers = append(n.layers, layer.NewDenseLayer(outputLength, dims))
+	n.layers = append(n.layers, layer.NewFullyConnectedLayer(outputLength, dims))
 	return n
 }
 
-func (n *Network) AddOutputLayer() *Network {
+func (n *Network) AddReLULayer() *Network {
+	var dims []int
+	if len(n.layers) == 0 {
+		dims = n.inputDims
+	} else {
+		dims = n.layers[len(n.layers)-1].OutputDims()
+	}
+	n.layers = append(n.layers, layer.NewReLULayer(dims))
+	return n
+}
+
+func (n *Network) AddSoftmaxLayer() *Network {
 	var dims []int
 	if len(n.layers) == 0 {
 		dims = n.inputDims
@@ -75,7 +86,7 @@ func (n *Network) AddOutputLayer() *Network {
 		dims = n.layers[len(n.layers)-1].OutputDims()
 	}
 
-	n.layers = append(n.layers, layer.NewOutputLayer(dims))
+	n.layers = append(n.layers, layer.NewSoftmaxLayer(dims))
 	return n
 }
 
@@ -126,9 +137,36 @@ func (n *Network) Fit(inputs []maths.Tensor, labels []maths.Tensor, epochs int, 
 	}
 }
 
+func (n *Network) Validate(inputs []maths.Tensor, labels []maths.Tensor) {
+	if len(labels) != len(inputs) {
+		panic("length of labels is not equal to length of inputs")
+	}
+	fmt.Printf("Validating with %d inputs\n", len(inputs))
+	averageLoss := 0.0
+	accuracy := 0.0
+	for i := range inputs {
+		// train the network
+		output := n.forward(inputs[i])
+		loss := n.loss.CalculateLoss(labels[i].Values(), output.Values())
+		averageLoss += maths.SumFloat64Slice(loss.Values())
+		if maths.FindMaxIndexFloat64Slice(labels[i].Values()) == maths.FindMaxIndexFloat64Slice(output.Values()) {
+			accuracy++
+		}
+	}
+	fmt.Printf("Validation average loss: %f\n", averageLoss/float64(len(inputs)))
+	fmt.Printf("Validation accuracy: %.2f\n", accuracy/float64(len(inputs)))
+}
+
+// Returns a slice of probabilities
 func (n *Network) Predict(input maths.Tensor) []float64 {
 	output := n.forward(input)
 	return output.Values()
+}
+
+// Returns the highest index from the prediction
+func (n *Network) PredictIndex(input maths.Tensor) int {
+	output := n.forward(input)
+	return maths.FindMaxIndexFloat64Slice(output.Values())
 }
 
 func (n *Network) forward(input maths.Tensor) maths.Tensor {

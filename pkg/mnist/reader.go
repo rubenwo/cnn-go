@@ -1,12 +1,15 @@
 package mnist
 
 import (
-	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/rubenwo/cnn-go/pkg/cnn/maths"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
+	"log"
 	"os"
 )
 
@@ -17,22 +20,39 @@ func ReadGrayImages(path string, limit int) ([]maths.Tensor, error) {
 	}
 	defer f.Close()
 
-	reader := bufio.NewReader(f)
-
 	var header struct{ Magic, N, Rows, Cols int32 }
-	if err := binary.Read(reader, binary.BigEndian, &header); err != nil {
+	if err := binary.Read(f, binary.BigEndian, &header); err != nil {
 		return nil, errors.New("bad header")
 	}
 	if header.Magic != 2051 {
 		return nil, errors.New("wrong magic number in header")
 	}
 	bytes := make([]byte, header.N*header.Rows*header.Cols)
-	if _, err = io.ReadFull(reader, bytes); err != nil {
+	if _, err = io.ReadFull(f, bytes); err != nil {
 		return nil, fmt.Errorf("%w, could not read full", err)
 	}
 
 	if limit > int(header.N) {
 		return nil, fmt.Errorf("limit is larger than the amount of images in the dataset")
+	}
+	{
+		byteIndex := (28 * 28) * 10
+
+		bounds := image.Rect(0, 0, 28, 28)
+		gray := image.NewGray(bounds)
+		for x := 0; x < int(header.Rows); x++ {
+			for y := 0; y < int(header.Cols); y++ {
+				gray.SetGray(x, y, color.Gray{Y: bytes[byteIndex]})
+				byteIndex++
+			}
+		}
+
+		f, err := os.Create("output.png")
+		if err != nil {
+			log.Fatal(err)
+		}
+		png.Encode(f, gray)
+		f.Close()
 	}
 
 	byteIndex := 0
@@ -57,9 +77,9 @@ func ReadLabels(path string, limit int) ([]int, error) {
 		return nil, fmt.Errorf("couldn't open file: %w", err)
 	}
 	defer f.Close()
-	reader := bufio.NewReader(f)
+
 	var header struct{ Magic, N int32 }
-	if err := binary.Read(reader, binary.BigEndian, &header); err != nil {
+	if err := binary.Read(f, binary.BigEndian, &header); err != nil {
 		return nil, errors.New("bad header")
 	}
 	if header.Magic != 2049 {
@@ -67,7 +87,7 @@ func ReadLabels(path string, limit int) ([]int, error) {
 	}
 
 	bytes := make([]byte, header.N)
-	if _, err = io.ReadFull(reader, bytes); err != nil {
+	if _, err = io.ReadFull(f, bytes); err != nil {
 		return nil, fmt.Errorf("%w, could not read full", err)
 	}
 	if limit > int(header.N) {

@@ -1,7 +1,6 @@
 package maths
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -25,13 +24,16 @@ func NewCoordIterator(corner1, corner2 []int) *CoordIterator {
 		finalIndex:    1,
 	}
 
+	//Ensure start is at minimum coords within region, end is at maximum
 	for i := 0; i < len(it.startCoords); i++ {
 		it.startCoords[i] = int(math.Min(float64(corner1[i]), float64(corner2[i])))
 		it.currentCoords[i] = it.startCoords[i]
 		it.finalCoords[i] = int(math.Max(float64(corner1[i]), float64(corner2[i]))) - 1
 
+		//The total number of integer coordinates within the region (not considering stride)
 		it.finalIndex *= (it.finalCoords[i] - it.startCoords[i]) + 2
 	}
+	//At each iteration, we increment the coordinate before returning it. This means that our starting position has to be 1 stride less than the first coord.
 	it.currentCoords[0]--
 	return it
 }
@@ -60,49 +62,22 @@ type StridingCoordIterator struct {
 
 func NewStridingCoordIterator(corner1, corner2, strides []int) *StridingCoordIterator {
 	it := &StridingCoordIterator{corner1: corner1, strides: strides}
-	cornerDiff := func(l, r []int) []int {
-		ret := make([]int, len(l))
-		for i := 0; i < len(l); i++ {
-			// left minus right
-			ret[i] = l[i] - r[i]
-		}
-		return ret
-	}(corner2, corner1)
-
-	adjustedDifference := func(l, r []int) []int {
-		ret := make([]int, len(l))
-		for i := 0; i < len(l); i++ {
-			// left divided right
-			ret[i] = l[i] / r[i]
-		}
-		return ret
-	}(cornerDiff, strides)
-
+	// (Difference between corner2 and corner1) / strides
+	adjustedDifference := DivideIntSlices(SubtractIntSlices(corner2, corner1), strides)
 	it.coordIter = NewCoordIterator(make([]int, len(corner1)), adjustedDifference)
 	return it
 }
+
 func (it *StridingCoordIterator) GetCurrentCoords() []int { return it.currentCoords }
 func (it *StridingCoordIterator) GetCurrentCount() int    { return it.coordIter.GetCurrentCount() }
 func (it *StridingCoordIterator) HasNext() bool           { return it.coordIter.HasNext() }
 func (it *StridingCoordIterator) Next() []int {
-	mult := func(l, r []int) []int {
-		ret := make([]int, len(l))
-		for i := 0; i < len(ret); i++ {
-			ret[i] = l[i] * r[i]
-		}
-		return ret
-	}(it.coordIter.Next(), it.strides)
-
-	it.currentCoords = func(l, r []int) []int {
-		ret := make([]int, len(l))
-		for i := 0; i < len(ret); i++ {
-			ret[i] = l[i] + r[i]
-		}
-		return ret
-	}(mult, it.corner1)
+	it.currentCoords = AddIntSlices(MulIntSlices(it.coordIter.Next(), it.strides), it.corner1)
 	return it.currentCoords
 }
 
+// RegionsIterator Iterates through all possible regions (of a certain size) that can be made from this tensor.
+// Can be instantiated with or without strides.
 type RegionsIterator struct {
 	regionSizes  []int
 	bottomCorner []int
@@ -110,73 +85,38 @@ type RegionsIterator struct {
 
 	CoordIterator CoordIteratorInterface
 
-	tensor *Tensor
+	tensor *Tensor // Reference to tensor so we can perform operations on it
 }
 
 func (it *RegionsIterator) setup(regionSizes, padding []int) {
 	regionSizeCopy := regionSizes
 
+	//Ensure regions are the same size by appending dimensions of length 1
 	if len(regionSizeCopy) < len(it.tensor.dimension) {
 		regionSizeCopy = make([]int, len(it.tensor.dimension))
 		for i := 0; i < len(regionSizes); i++ {
 			regionSizeCopy[i] = regionSizes[i]
 		}
 		for i := len(regionSizes); i < len(it.tensor.dimension); i++ {
+			// Pad with 1's
 			regionSizeCopy[i] = 1
 		}
 	}
 
-	it.regionSizes = func(r []int, f int) []int {
-		ret := make([]int, len(r))
-		for i := 0; i < len(ret); i++ {
-			ret[i] = r[i] + f
-		}
-		return ret
-	}(regionSizeCopy, -1)
-
+	it.regionSizes = AddIntToAll(regionSizeCopy, -1)
 	it.bottomCorner = make([]int, len(it.tensor.dimension))
+	it.bottomCorner = SubtractIntSlices(it.bottomCorner, padding)
+	//Top corner is limited by size of region
+	it.topCorner = SubtractIntSlices(it.tensor.dimension, regionSizeCopy)
+	//And extended by padding
+	it.topCorner = AddIntSlices(it.topCorner, padding)
 
-	it.bottomCorner = func(r, p []int) []int {
-		ret := make([]int, len(r))
-		for i := 0; i < len(ret); i++ {
-			if len(p) > i {
-				ret[i] = r[i] - p[i]
-			} else {
-				ret[i] = r[i]
-			}
-		}
-		return ret
-	}(it.bottomCorner, padding)
-
-	it.topCorner = func(r, p []int) []int {
-		ret := make([]int, len(r))
-		for i := 0; i < len(ret); i++ {
-			if len(p) > i {
-				ret[i] = r[i] - p[i]
-			} else {
-				fmt.Println("Should prolly not happen")
-				ret[i] = r[i]
-			}
-		}
-		return ret
-	}(it.tensor.dimension, regionSizeCopy)
-
-	it.topCorner = func(r, p []int) []int {
-		ret := make([]int, len(r))
-		for i := 0; i < len(ret); i++ {
-			if len(p) > i {
-				ret[i] = r[i] + p[i]
-			} else {
-				ret[i] = r[i]
-			}
-		}
-		return ret
-	}(it.topCorner, padding)
 }
 
 func NewRegionsIterator(t *Tensor, regionSizes, padding []int) *RegionsIterator {
 	it := &RegionsIterator{tensor: t}
 	it.setup(regionSizes, padding)
+
 	it.CoordIterator = NewCoordIterator(it.bottomCorner, it.topCorner)
 	return it
 }
@@ -194,21 +134,13 @@ func (it *RegionsIterator) HasNext() bool {
 
 func (it *RegionsIterator) Next() *Tensor {
 	regionBottomCorner := it.CoordIterator.Next()
-	regionTopCorner := func(r, p []int) []int {
-		ret := make([]int, len(r))
-		for i := 0; i < len(ret); i++ {
-			if len(p) > i {
-				ret[i] = r[i] + p[i]
-			} else {
-				ret[i] = r[i]
-			}
-		}
-		return ret
-	}(regionBottomCorner, it.regionSizes)
-
+	regionTopCorner := AddIntSlices(regionBottomCorner, it.regionSizes)
 	return it.tensor.Region(regionBottomCorner, regionTopCorner)
 }
 
+// RegionsIteratorIteratorIterates through all possible regions (of a certain size) that can be made from this tensor.
+// While RegionsIterator returns Tensors, this iterator returns Iterators.
+// Can be instantiated with or without strides.
 type RegionsIteratorIterator struct {
 	iter *RegionsIterator
 }
@@ -221,20 +153,16 @@ func NewRegionsIteratorIterator(tensor *Tensor, regionSizes, padding []int) *Reg
 func (it *RegionsIteratorIterator) HasNext() bool { return it.iter.HasNext() }
 func (it *RegionsIteratorIterator) Next() *ValuesIterator {
 	regionBottomCorner := it.iter.CoordIterator.Next()
-	regionTopCorner := func(l, r []int) []int {
-		ret := make([]int, len(l))
-		for i := 0; i < len(ret); i++ {
-			ret[i] = l[i] + r[i]
-		}
-		return ret
-	}(regionBottomCorner, it.iter.regionSizes)
+	regionTopCorner := AddIntSlices(regionBottomCorner, it.iter.regionSizes)
 
 	return NewValuesIterator(it.iter.tensor, NewCoordIterator(regionBottomCorner, regionTopCorner))
 }
 
+// ValuesIterator iterates through values in the tensor.
+// Primarily used to improve performance on functions that demand large regions to be extracted.
 type ValuesIterator struct {
 	iter   *CoordIterator
-	tensor *Tensor
+	tensor *Tensor // reference to the tensor on which the iterator works
 }
 
 func NewValuesIterator(tensor *Tensor, iter *CoordIterator) *ValuesIterator {
@@ -244,6 +172,7 @@ func NewValuesIterator(tensor *Tensor, iter *CoordIterator) *ValuesIterator {
 func (it *ValuesIterator) HasNext() bool { return it.iter.HasNext() }
 func (it *ValuesIterator) Next() float64 { return it.tensor.AtCoords(it.iter.Next()) }
 
+// InnerProduct Multiply each element of base with a corresponding element of other, then sum these values.
 func (it *ValuesIterator) InnerProduct(t *Tensor) float64 {
 	result := 0.0
 	for i := 0; i < len(t.values); i++ {

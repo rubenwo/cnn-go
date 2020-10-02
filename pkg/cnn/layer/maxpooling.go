@@ -16,37 +16,37 @@ type MaxPoolingLayer struct {
 }
 
 func NewMaxPoolingLayer(strides, sizes, inputDims []int) *MaxPoolingLayer {
-	maxPool := &MaxPoolingLayer{}
-	maxPool.strides = strides
-	for len(maxPool.strides) < len(inputDims) {
-		maxPool.strides = append(maxPool.strides, 1)
+	m := &MaxPoolingLayer{strides: strides, sizes: sizes}
+
+	for len(m.strides) < len(inputDims) {
+		m.strides = append(m.strides, 1)
 	}
 
-	maxPool.sizes = sizes
-	for len(maxPool.sizes) < len(inputDims) {
-		maxPool.sizes = append(maxPool.sizes, 1)
+	for len(m.sizes) < len(inputDims) {
+		m.sizes = append(m.sizes, 1)
 	}
 
-	maxPool.inputTensor = *maths.NewTensor(inputDims, nil)
+	m.inputTensor = *maths.NewTensor(inputDims, nil)
 
 	outputDims := make([]int, len(inputDims))
 	for i := 0; i < len(outputDims); i++ {
-		outputDims[i] = int(math.Ceil((float64(inputDims[i]) - float64(maxPool.sizes[i]) + 1.0) / float64(maxPool.strides[i])))
+		outputDims[i] = int(math.Ceil((float64(inputDims[i]) - float64(m.sizes[i]) + 1) / float64(m.strides[i])))
 	}
-	maxPool.outputTensor = *maths.NewTensor(outputDims, nil)
-	maxPool.maxIndices = make([]int, len(maxPool.outputTensor.Values()))
 
-	return maxPool
+	m.outputTensor = *maths.NewTensor(outputDims, nil)
+	m.maxIndices = make([]int, m.outputTensor.Len())
+	return m
 }
 
 func (m *MaxPoolingLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
+	//Apply max function across input
 
-	for i := maths.NewRegionsIteratorWithStrides(&input, m.sizes, []int{}, m.strides); i.HasNext(); {
-		nextRegion := i.Next()
+	for iter := maths.NewRegionsIteratorWithStrides(&input, m.sizes, []int{}, m.strides); iter.HasNext(); {
+		nextRegion := iter.Next()
 		maxIndex := nextRegion.MaxValueIndex()
 
-		m.maxIndices[i.CoordIterator.GetCurrentCount()-1] = maxIndex
-		m.outputTensor.SetValue(i.CoordIterator.GetCurrentCount()-1, nextRegion.Values()[maxIndex])
+		m.maxIndices[iter.CoordIterator.GetCurrentCount()-1] = maxIndex
+		m.outputTensor.SetValue(iter.CoordIterator.GetCurrentCount()-1, nextRegion.At(maxIndex))
 	}
 
 	return m.outputTensor
@@ -54,14 +54,16 @@ func (m *MaxPoolingLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
 func (m *MaxPoolingLayer) BackwardPropagation(gradient maths.Tensor, lr float64) maths.Tensor {
 	inputGradients := m.inputTensor.Zeroes()
 
-	for i := maths.NewRegionsIteratorWithStrides(inputGradients, m.sizes, []int{}, m.strides); i.HasNext(); {
-		i.Next()
-		maxIndex := m.maxIndices[i.CoordIterator.GetCurrentCount()-1]
+	for iter := maths.NewRegionsIteratorWithStrides(inputGradients, m.sizes, []int{}, m.strides); iter.HasNext(); {
+		iter.Next()
+
+		maxIndex := m.maxIndices[iter.CoordIterator.GetCurrentCount()-1]
 		maxCoords := maths.HornerToCoords(maxIndex, m.sizes)
-		regionStart := i.CoordIterator.GetCurrentCoords()
+
+		regionStart := iter.CoordIterator.GetCurrentCoords()
 		coordsOfMax := maths.AddIntSlices(regionStart, maxCoords)
 
-		inputGradients.Set(coordsOfMax, gradient.Values()[i.CoordIterator.GetCurrentCount()-1])
+		inputGradients.Set(coordsOfMax, gradient.At(iter.CoordIterator.GetCurrentCount()-1))
 	}
 
 	return *inputGradients
