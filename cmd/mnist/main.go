@@ -24,17 +24,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	nn := cnn.New([]int{28, 28}, 0.005, &metrics.CrossEntropyLoss{})
-
-	nn.AddConvolutionLayer([]int{3, 3}, 8).
-		AddMaxPoolingLayer(2, []int{2, 2}).
-		AddFullyConnectedLayer(10). // 0-9
-		AddSoftmaxLayer()
-
-	nn.Fit(imageTensors, labelTensors, 12, 64, true, 100, func() {
-		nn.SetLearningRate(nn.LearningRate() * 0.82)
-	})
-
 	valLabels, err := mnist.ReadLabels("./assets/mnist/t10k-labels-idx1-ubyte", 10000)
 	if err != nil {
 		log.Fatal(err)
@@ -44,6 +33,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	nn := cnn.New([]int{28, 28}, 0.005, &metrics.CrossEntropyLoss{})
+
+	nn.AddConvolutionLayer([]int{3, 3}, 8).
+		AddMaxPoolingLayer(2, []int{2, 2}).
+		AddFullyConnectedLayer(10). // 0-9
+		AddSoftmaxLayer()
+
+	nn.Fit(imageTensors, labelTensors, valImageTensors, valLabelTensors, 12, 64, true, 100, func() {
+		nn.SetLearningRate(nn.LearningRate() * 0.82)
+	})
+
 	nn.Validate(valImageTensors, valLabelTensors)
 
 }

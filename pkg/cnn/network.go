@@ -6,6 +6,7 @@ import (
 	"github.com/rubenwo/cnn-go/pkg/cnn/maths"
 	"github.com/rubenwo/cnn-go/pkg/cnn/metrics"
 	"math/rand"
+	"runtime"
 )
 
 type Network struct {
@@ -92,11 +93,12 @@ func (n *Network) AddSoftmaxLayer() *Network {
 
 // Fit will train the CNN. inputs are the inputs, labels are the labels.
 // epochs are the amount of times the network is fitted
+// if valInputs and valLabels != nil a validation step is ran on that data after each epoch
 // batchSize is the size of every propagation batch.
 // if verbose then logging is enabled and is written to to stdout with fmt
 // every 'logRate' of iterations a message is written when verbose == true
 // onBatchDone is a callback that is called every time a batch is done. This can be used to reduce the learning rate for example
-func (n *Network) Fit(inputs []maths.Tensor, labels []maths.Tensor, epochs int, batchSize int, verbose bool, logRate int, onEpochDone func()) {
+func (n *Network) Fit(inputs, labels, valInputs, valLabels []maths.Tensor, epochs int, batchSize int, verbose bool, logRate int, onEpochDone func()) {
 	fmt.Println("Fit: ignoring batch size")
 	if len(labels) != len(inputs) {
 		panic("length of labels is not equal to length of inputs")
@@ -130,6 +132,9 @@ func (n *Network) Fit(inputs []maths.Tensor, labels []maths.Tensor, epochs int, 
 				}
 			}
 		}
+		if valLabels != nil && valInputs != nil {
+			n.Validate(valInputs, valLabels)
+		}
 		fmt.Printf("Completed epoch: %d\n", epoch)
 		if onEpochDone != nil {
 			onEpochDone()
@@ -141,18 +146,52 @@ func (n *Network) Validate(inputs []maths.Tensor, labels []maths.Tensor) {
 	if len(labels) != len(inputs) {
 		panic("length of labels is not equal to length of inputs")
 	}
-	fmt.Printf("Validating with %d inputs\n", len(inputs))
+	fmt.Printf("Validating network with %d inputs...\n", len(inputs))
+
+	type job struct {
+		f func() (loss, accuracy float64)
+	}
+
+	type result struct {
+		loss, accuracy float64
+	}
+
+	jobs := make(chan job, len(inputs))
+	results := make(chan result, len(inputs))
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func(jobs <-chan job, results chan<- result) {
+			for j := range jobs {
+				loss, accuracy := j.f()
+				results <- result{loss: loss, accuracy: accuracy}
+			}
+		}(jobs, results)
+	}
+
 	averageLoss := 0.0
 	accuracy := 0.0
 	for i := range inputs {
-		// train the network
-		output := n.forward(inputs[i])
-		loss := n.loss.CalculateLoss(labels[i].Values(), output.Values())
-		averageLoss += maths.SumFloat64Slice(loss.Values())
-		if maths.FindMaxIndexFloat64Slice(labels[i].Values()) == maths.FindMaxIndexFloat64Slice(output.Values()) {
-			accuracy++
-		}
+		input := inputs[i]
+		label := labels[i]
+		jobs <- job{f: func() (loss, accuracy float64) {
+			acc := 0.0
+			output := n.forward(input)
+			l := n.loss.CalculateLoss(label.Values(), output.Values())
+			averageLoss := maths.SumFloat64Slice(l.Values())
+			if maths.FindMaxIndexFloat64Slice(label.Values()) == maths.FindMaxIndexFloat64Slice(output.Values()) {
+				acc = 1
+			}
+			return averageLoss, acc
+		}}
 	}
+	close(jobs)
+
+	for i := 0; i < len(inputs); i++ {
+		res := <-results
+		averageLoss += res.loss
+		accuracy += res.accuracy
+	}
+
 	fmt.Printf("Validation average loss: %f\n", averageLoss/float64(len(inputs)))
 	fmt.Printf("Validation accuracy: %.2f\n", accuracy/float64(len(inputs)))
 }

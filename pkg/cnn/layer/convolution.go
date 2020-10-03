@@ -68,6 +68,28 @@ func worker(jobs <-chan job, results chan<- result) {
 func (c *ConvolutionLayer) crossCorrelationMap(base, filter *maths.Tensor, ccMapSize, padding []int) *maths.Tensor {
 	ccMapValues := make([]float64, maths.ProductIntSlice(ccMapSize))
 
+	numOps := 0
+	rii := maths.NewRegionsIteratorIterator(base, filter.Dimensions(), padding)
+	for rii.HasNext() {
+		ccMapValues[numOps] = rii.Next().InnerProduct(filter)
+		numOps++
+	}
+
+	// assert numOps != len(ccMapValues)
+	if numOps != len(ccMapValues) {
+		panic("number of InnerProduct operations is not equal to len(ccMapValues)")
+	}
+
+	// Return a tensor with the cross-correlation map
+	return maths.NewTensor(ccMapSize, ccMapValues)
+}
+
+// crossCorrelationMap creates a cross-correlation map based on a filter.
+// ccMapSize is passed so we don't have to recalculate it every time.
+// base is the input where the filter needs to be applied to.
+func (c *ConvolutionLayer) crossCorrelationMapParallel(base, filter *maths.Tensor, ccMapSize, padding []int) *maths.Tensor {
+	ccMapValues := make([]float64, maths.ProductIntSlice(ccMapSize))
+
 	// We append all regions to slice so we can process each region in parallel. Which might be faster if the regions
 	// are large enough
 	var regions []*maths.ValuesIterator
@@ -86,22 +108,16 @@ func (c *ConvolutionLayer) crossCorrelationMap(base, filter *maths.Tensor, ccMap
 		panic(fmt.Sprintf("len(ccMapValues)=%d != len(regions)=%d", len(ccMapValues), len(regions)))
 	}
 
-	// For now we process each region sequentially because it takes more time to dispatch the values to workers than it
-	// takes to range over the regions and calculate the InnerProduct ourselves
-	for i := 0; i < len(ccMapValues); i++ {
-		ccMapValues[i] = regions[i].InnerProduct(filter)
+	// process each regions Inner Product in parallel using n = runtime.NumCPU() workers
+	for i := range ccMapValues {
+		// Send job to worker
+		c.jobs <- job{i: i, f: func(i int) float64 { return regions[i].InnerProduct(filter) }}
 	}
-
-	//// process each regions Inner Product in parallel using n = runtime.NumCPU() workers
-	//for i := range ccMapValues {
-	//	// Send job to worker
-	//	c.jobs <- job{i: i, f: func(i int) float64 { return regions[i].InnerProduct(filter) }}
-	//}
-	//for range ccMapValues {
-	//	// receive result and set result in ccMapValues
-	//	res := <-c.results
-	//	ccMapValues[res.i] = res.v
-	//}
+	for range ccMapValues {
+		// receive result and set result in ccMapValues
+		res := <-c.results
+		ccMapValues[res.i] = res.v
+	}
 
 	// Return a tensor with the cross-correlation map
 	return maths.NewTensor(ccMapSize, ccMapValues)
