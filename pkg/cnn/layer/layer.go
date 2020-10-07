@@ -9,4 +9,7 @@ type Layer interface {
 	BackwardPropagation(gradient maths.Tensor, lr float64) maths.Tensor
 
 	OutputDims() []int
+
+	//Copy() Layer
+	//Mutate()
 }

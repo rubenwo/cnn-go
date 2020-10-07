@@ -3,7 +3,11 @@ package layer
 import (
 	"fmt"
 	"github.com/rubenwo/cnn-go/pkg/cnn/maths"
+	"image"
+	"image/color"
+	"image/png"
 	"math"
+	"os"
 	"runtime"
 )
 
@@ -13,6 +17,8 @@ type ConvolutionLayer struct {
 	ccMapSize            []int
 	outputDimensions     []int
 	recentInput          maths.Tensor
+
+	iteration int
 
 	jobs    chan job
 	results chan result
@@ -26,6 +32,7 @@ func NewConvolutionLayer(filterDimensionSizes []int, depth int, inputDims []int)
 		conv.filterDimensionSizes = append(conv.filterDimensionSizes, 1)
 	}
 
+	//Calculate the size of the cross correlation map resultant from applying a given filter
 	conv.ccMapSize = maths.SubtractIntSlices(inputDims, maths.AddIntToAll(conv.filterDimensionSizes, -1))
 
 	conv.filters = *maths.NewTensor(append(conv.filterDimensionSizes, depth), nil)
@@ -43,6 +50,11 @@ func NewConvolutionLayer(filterDimensionSizes []int, depth int, inputDims []int)
 		go worker(conv.jobs, conv.results)
 	}
 
+	n, err := conv.SaveFiltersAsImages("./filters")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Saved %d filters to images\n", n)
 	return conv
 }
 
@@ -69,6 +81,9 @@ func (c *ConvolutionLayer) crossCorrelationMap(base, filter *maths.Tensor, ccMap
 	ccMapValues := make([]float64, maths.ProductIntSlice(ccMapSize))
 
 	numOps := 0
+	// "slide" the filter over the base.
+	// For every 'region' where the filter can come, calculate the inner product of that part of base with the filter.
+	// assign this product to the cross-correlation map.
 	rii := maths.NewRegionsIteratorIterator(base, filter.Dimensions(), padding)
 	for rii.HasNext() {
 		ccMapValues[numOps] = rii.Next().InnerProduct(filter)
@@ -127,8 +142,12 @@ func (c *ConvolutionLayer) ForwardPropagation(input maths.Tensor) maths.Tensor {
 	c.recentInput = input // might want to rewrite this because it blocks parallel batches
 	var output *maths.Tensor
 
-	//Iterate through each filter, appending result to output tensor.
+	// Iterate through each filter, appending result to output tensor.
+	// A filter is a "sub-tensor" of the filters tensor.
 	for iter := maths.NewRegionsIterator(&c.filters, c.filterDimensionSizes, []int{}); iter.HasNext(); {
+		// Compute the cross-correlation map from the input tensor with a filter.
+		// The size of the cross-correlation map has been computed before-hand.
+		// No padding
 		newMap := c.crossCorrelationMap(&input, iter.Next(), c.ccMapSize, []int{})
 		if output == nil {
 			output = newMap
@@ -147,9 +166,12 @@ func (c *ConvolutionLayer) BackwardPropagation(gradient maths.Tensor, lr float64
 	var filterGradients *maths.Tensor
 	inputGradients := c.recentInput.Zeroes()
 
-	// We can think of outputGrad as a series of "gradient filters" which we apply to the recent input.
+	// We can think of gradient as a series of "gradient filters" which we apply to the recent input.
 	// This is the size of each of those filters.
 	outputGradientSize := gradient.FirstDimsCopy(len(gradient.Dimensions()) - 1)
+
+	//Iterate through each output grad, appending result to filter grad tensor.
+	//Simultaneously, iterate through our original filters, altering them via gradient descent
 	iterGradient := maths.NewRegionsIterator(&gradient, outputGradientSize, []int{})
 	iterFilter := maths.NewRegionsIterator(&c.filters, c.filterDimensionSizes, []int{})
 
@@ -183,7 +205,61 @@ func (c *ConvolutionLayer) BackwardPropagation(gradient maths.Tensor, lr float64
 	// Gradient descent on filters
 	c.filters = *c.filters.Add(filterGradients, -1*lr)
 
+	// Save each filter as an image. This allows for visualisation of the changes to the filter
+	//if c.iteration < 100 {
+	//	if err := os.Mkdir(fmt.Sprintf("./filters/filters-iteration-%d", c.iteration), 0777); err != nil {
+	//		fmt.Println(err)
+	//	}
+	//	_, err := c.SaveFiltersAsImages(fmt.Sprintf("./filters/filters-iteration-%d", c.iteration))
+	//	if err != nil {
+	//		fmt.Println(err)
+	//	}
+	//}
+	//c.iteration++
 	return *inputGradients
 }
 
 func (c *ConvolutionLayer) OutputDims() []int { return c.outputDimensions }
+
+// SaveFiltersAsImages saves the filters to images relative to 'path'
+// returns the amount of images saved.
+// saves as grayscale for now
+func (c *ConvolutionLayer) SaveFiltersAsImages(path string) (int, error) {
+	numFilters := 0
+	for iter := maths.NewRegionsIterator(&c.filters, c.filterDimensionSizes, []int{}); iter.HasNext(); {
+		t := iter.Next() // grab a filter
+
+		pixels := make([]uint8, len(t.Values())) // allocate pixels
+
+		for p := 0; p < len(pixels); p++ {
+			c := 255 - uint8(t.At(p)*255)
+			pixels[p] = c
+		}
+		gray := image.NewGray(image.Rect(0, 0, c.filterDimensionSizes[0], c.filterDimensionSizes[1]))
+
+		pixelIndex := 0
+		for x := 0; x < c.filterDimensionSizes[0]; x++ {
+			for y := 0; y < c.filterDimensionSizes[1]; y++ {
+				gray.SetGray(x, y, color.Gray{Y: pixels[pixelIndex]})
+				pixelIndex++
+			}
+		}
+
+		f, err := os.Create(fmt.Sprintf("%s/filter_%d.png", path, numFilters))
+		if err != nil {
+			return numFilters, err
+		}
+
+		if err := png.Encode(f, gray); err != nil {
+			return numFilters, err
+		}
+
+		if err := f.Close(); err != nil {
+			return numFilters, err
+		}
+
+		numFilters++
+	}
+
+	return numFilters, nil
+}

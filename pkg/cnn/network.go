@@ -114,6 +114,7 @@ func (n *Network) Fit(inputs, labels, valInputs, valLabels []maths.Tensor, epoch
 		for i := range inputs {
 			// train the network
 			output := n.forward(inputs[i])
+			// Use the loss as input for the backpropagation
 			n.backward(n.loss.CalculateLossDerivative(labels[i].Values(), output.Values()))
 
 			if verbose {
@@ -193,3 +194,24 @@ func (n *Network) backward(outputGradient maths.Tensor) maths.Tensor {
 	}
 	return inputGradient
 }
+
+//// Copy is a deep copy of the network, this is useful for GA's when mutating the network
+//func (n *Network) Copy() *Network {
+//
+//	layers := make([]layer.Layer, len(n.layers))
+//	for i := 0; i < len(layers); i++ {
+//		layers[i] = n.layers[i].Copy()
+//	}
+//
+//	network := &Network{
+//		layers:       layers,
+//		inputDims:    n.inputDims,
+//		learningRate: n.learningRate,
+//		loss:         n.loss,
+//	}
+//	return network
+//}
+//
+//func (n *Network) Mutate() {
+//
+//}
